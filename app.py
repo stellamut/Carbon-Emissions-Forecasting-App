@@ -1,117 +1,155 @@
-# ====================================================
-# SDG 13: Climate Action – Forecast Carbon Emissions
-# Theme: Machine Learning Meets the UN SDGs
-# ====================================================
-
-# 📦 Import libraries
+import streamlit as st
+import joblib
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.cluster import KMeans
+# --- Custom CSS for Theming and Font ---
+st.markdown("""
+<style>
+    /* Font: Futura Family */
+    @font-face {
+        font-family: 'Futura';
+        src: url('https://fonts.cdnfonts.com/s/7213/FuturaLT-Book.woff') format('woff'); /* Or a local path if you host the font */
+        font-weight: normal;
+        font-style: normal;
+    }
+    @font-face {
+        font-family: 'Futura';
+        src: url('https://fonts.cdnfonts.com/s/7213/FuturaLT-Bold.woff') format('woff');
+        font-weight: bold;
+        font-style: normal;
+    }
 
-# ----------------------------------------------------
-# 🧩 1. Load Dataset
-# ----------------------------------------------------
-# Example dataset: CO2 emissions (kt) from World Bank (can replace with UN SDG data)
-url = "https://raw.githubusercontent.com/datasets/co2-fossil-global/master/global.csv"
-df = pd.read_csv(url)
+    body {
+        font-family: 'Futura', sans-serif;
+        color: #1A431A; /* Dark Green */
+        background-color: #FDF9F3; /* A very light cream/off-white */
+    }
 
-print("Dataset shape:", df.shape)
-df.head()
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Futura', sans-serif;
+        color: #1A431A; /* Dark Green for headings */
+    }
 
-# ----------------------------------------------------
-# 🧹 2. Data Preprocessing
-# ----------------------------------------------------
-# Rename columns for convenience
-df.rename(columns={'Year': 'year', 'Total': 'co2_emissions'}, inplace=True)
+    .stButton>button {
+        background-color: #FFBF00; /* Golden Yellow for buttons */
+        color: #FFFFFF; /* White text on buttons */
+        border-radius: 8px;
+        border: none;
+        padding: 10px 20px;
+        font-weight: bold;
+        transition: background-color 0.3s;
+    }
+    .stButton>button:hover {
+        background-color: #e6a800; /* Slightly darker yellow on hover */
+        color: #FFFFFF;
+    }
 
-# Drop missing or invalid rows
-df = df.dropna(subset=['year', 'co2_emissions'])
+    /* Streamlit Metric Styling */
+    [data-testid="stMetric"] > div {
+        background-color: #FFDAB9; /* Peach background for metrics */
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+        text-align: center;
+        color: #1A431A; /* Dark Green text for metrics */
+    }
+    [data-testid="stMetricLabel"] {
+        color: #1A431A; /* Dark Green */
+        font-size: 1.1em;
+        font-weight: bold;
+    }
+    [data-testid="stMetricValue"] {
+        color: #1A431A; /* Dark Green */
+        font-size: 2.5em;
+        font-weight: bold;
+    }
+    [data-testid="stMetricDelta"] {
+        color: #9ACD32; /* Lime Green for positive delta */
+        /* Use inverse color for negative delta by default */
+    }
+    
+    /* Sidebar Styling */
+    .css-1d391kg, .css-1aumjbt { /* Streamlit's sidebar classes */
+        background-color: #FDF9F3; /* Light cream for sidebar */
+    }
+    .sidebar .sidebar-content {
+        background-color: #FDF9F3; /* Light cream for sidebar content */
+    }
 
-# Keep only numeric features for regression
-df = df[df['co2_emissions'] > 0]
+    /* Info/Warning blocks */
+    .stAlert {
+        background-color: #FDF9F3; /* Use a neutral light background */
+        border-left: 5px solid #FFBF00; /* Golden Yellow border for info */
+        color: #1A431A; /* Dark Green text */
+    }
+    .stAlert > div > span { /* For the icon */
+        color: #FFBF00 !important; /* Golden Yellow icon */
+    }
 
-# Create lag features (previous year’s emissions)
-df['lag1'] = df['co2_emissions'].shift(1)
-df['lag2'] = df['co2_emissions'].shift(2)
-df = df.dropna()
+    /* General text color for all other elements */
+    .stTextInput>div>div>input, .stNumberInput>div>div>input, .stSelectbox>div>div>select {
+        color: #1A431A; /* Dark Green */
+    }
+    
+</style>
+""", unsafe_allow_html=True)
 
-# Define features (X) and target (y)
-X = df[['lag1', 'lag2']]
-y = df['co2_emissions']
+# --- End of Custom CSS ---
 
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Standardize features
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
+# Load the saved assets (rest of your app.py)
+@st.cache_resource
+def load_assets():
+    model = joblib.load('xgb_co2_model.pkl')
+    scaler = joblib.load('scaler.pkl')
+    features = ['GDP', 'Elec_Cons_PC', 'Population', 'Renewable_Share', 'Coal_Share', 'CO2_Emissions_Lag1']
+    return model, scaler, features
 
-# ----------------------------------------------------
-# 🤖 3. Train Regression Models
-# ----------------------------------------------------
-models = {
-    "Linear Regression": LinearRegression(),
-    "Ridge Regression": Ridge(alpha=1.0),
-    "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42)
-}
+model, scaler, FEATURES = load_assets()
 
-results = {}
+st.title("🌍 SDG 13: Proactive Carbon Emission Forecaster")
+st.subheader("Simulate future CO₂ emissions based on key socio-economic indicators.")
 
-for name, model in models.items():
-    model.fit(X_train_scaled, y_train)
-    y_pred = model.predict(X_test_scaled)
-    mae = mean_absolute_error(y_test, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-    r2 = r2_score(y_test, y_pred)
-    results[name] = {"MAE": mae, "RMSE": rmse, "R2": r2}
+# ... (rest of your Streamlit app code as designed before) ...
+# Example:
+with st.sidebar:
+    st.header("Policy Levers")
+    st.write("Adjust the projected values for the next year to simulate impact.")
+    
+    input_data = {
+        'GDP': st.number_input("Projected GDP (US$ Trillions)", value=2.0, min_value=0.1),
+        'Elec_Cons_PC': st.number_input("Elec. Consumption (kWh/capita)", value=5000, min_value=100),
+        'Population': st.number_input("Projected Population (Millions)", value=300, min_value=10),
+        'Renewable_Share': st.slider("Renewable Share in Energy (%)", value=15.0, min_value=0.0, max_value=100.0, step=0.1),
+        'Coal_Share': st.slider("Coal Share in Energy (%)", value=25.0, min_value=0.0, max_value=100.0, step=0.1),
+        'CO2_Emissions_Lag1': st.number_input("Previous Year's CO₂ Emissions (kt)", value=3000000, min_value=0)
+    }
 
-# Display results
-results_df = pd.DataFrame(results).T
-print("\nModel Evaluation Metrics:\n")
-print(results_df)
+if st.button("Forecast Emissions"):
+    input_df = pd.DataFrame([input_data])
+    X_pred = input_df[FEATURES]
+    X_pred_scaled = scaler.transform(X_pred)
+    predicted_co2 = model.predict(X_pred_scaled)[0]
 
-# ----------------------------------------------------
-# 📈 4. Visualization
-# ----------------------------------------------------
-best_model = models["Random Forest"]
-y_pred_best = best_model.predict(X_test_scaled)
+    st.markdown("---")
+    st.metric(
+        label="Projected CO₂ Emissions (kt)",
+        value=f"{predicted_co2:,.0f} kt",
+        delta=f"{(predicted_co2 - input_data['CO2_Emissions_Lag1']):,.0f} kt Change",
+        delta_color="inverse"
+    )
 
-plt.figure(figsize=(8,6))
-sns.scatterplot(x=y_test, y=y_pred_best)
-plt.xlabel("Actual CO2 Emissions (kt)")
-plt.ylabel("Predicted CO2 Emissions (kt)")
-plt.title("Predicted vs Actual CO2 Emissions")
-plt.grid(True)
-plt.show()
+    st.markdown("## 🔍 Policy Impact Analysis (Feature Importance)")
+    st.write("This shows which factors the model weighted most heavily for the prediction:")
+    
+    importance_df = pd.DataFrame({
+        'Feature': FEATURES,
+        'Importance': model.feature_importances_
+    }).sort_values(by='Importance', ascending=False)
 
-# ----------------------------------------------------
-# 🔍 5. (Optional) Unsupervised Learning Extension
-# Cluster Years by Emission Levels
-# ----------------------------------------------------
-# Cluster by emission magnitudes
-kmeans = KMeans(n_clusters=3, random_state=42)
-df['cluster'] = kmeans.fit_predict(df[['co2_emissions']])
-
-plt.figure(figsize=(8,5))
-sns.scatterplot(x='year', y='co2_emissions', hue='cluster', data=df, palette='viridis')
-plt.title("Clustering of Years by Emission Levels")
-plt.xlabel("Year")
-plt.ylabel("Global CO2 Emissions (kt)")
-plt.show()
-
-# ----------------------------------------------------
-# 🌱 6. Ethical Reflection (Output Summary)
-# ----------------------------------------------------
-print("\n--- Ethical Reflection ---")
-print("Potential Bias: Dataset focuses on global emissions; missing regional granularity may bias policy insights.")
-print("Fairness: Ensure representation of all regions and socio-economic contexts in data collection.")
-print("Sustainability: Accurate forecasting aids in setting emission targets and monitoring progress toward SDG 13.")
+    st.bar_chart(importance_df.set_index('Feature'))
+    
+    st.info(
+        "**Interpretation:** If 'Coal_Share' has high importance, policies targeting the reduction of coal use will likely have the biggest impact on future emissions."
+    )
