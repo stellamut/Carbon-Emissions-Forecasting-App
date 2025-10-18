@@ -1,0 +1,9 @@
+[theme]
+# Primary brand colors
+primaryColor="#9ACD32" # Lime Green for buttons, links, etc.
+backgroundColor="#FFFFFF" # Pure White for main content area
+secondaryBackgroundColor="#F8F8F8" # Light grey/off-white for sidebars/blocks
+textColor="#1A431A" # Dark Green for general text
+
+# Your custom colors for specific elements via markdown/css will override or complement these
+# These are just defaults.
